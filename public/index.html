@@ -13,10 +13,10 @@
     --cream:#FFF8EA;
     --gold:#F2B705;
     --gold-2:#D99A04;
-    --red:#E23B2E;
-    --green:#2FA84F;
-    --yellow:#F6C500;
-    --blue:#1E88D1;
+    --red:#ED1C24;
+    --green:#079447;
+    --yellow:#FFD600;
+    --blue:#159DE0;
     --ink:#181C39;
     --muted:#8B8FB8;
     --radius:14px;
@@ -27,6 +27,8 @@
     background:
       radial-gradient(circle at 15% 10%, #2A3170 0%, transparent 45%),
       radial-gradient(circle at 85% 90%, #2A1F5C 0%, transparent 45%),
+      radial-gradient(circle at 15px 15px, rgba(63,137,211,.14) 0 10px, transparent 11px) 0 0 / 76px 76px,
+      linear-gradient(135deg, transparent 44%, rgba(90,153,219,.045) 45% 55%, transparent 56%) 0 0 / 96px 96px,
       var(--navy);
     color:var(--cream);
     font-family:'Inter',sans-serif;
@@ -123,8 +125,9 @@
   .game-layout{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;}
 
   .board-shell{
-    background:var(--cream);border-radius:16px;padding:10px;
-    box-shadow:0 20px 50px rgba(0,0,0,.4);
+    background:#fff;border-radius:4px;padding:4px;
+    border:1px solid rgba(255,255,255,.45);
+    box-shadow:0 18px 42px rgba(0,0,0,.42);
   }
   .board{
     display:grid;
@@ -133,32 +136,37 @@
     width:min(88vw,480px);
     height:min(88vw,480px);
     gap:1px;
-    background:#E9E2D0;
-    border-radius:8px;
+    background:#92999d;
+    border:1px solid #788187;
+    border-radius:2px;
     overflow:visible;
     position:relative;
   }
-  .cell{background:var(--cream);position:relative;}
+  .cell{background:#f7f7f4;position:relative;}
   .cell.path{background:#fff;}
+  .cell.start-cell.red{background:var(--red);}
+  .cell.start-cell.green{background:var(--green);}
+  .cell.start-cell.yellow{background:var(--yellow);}
+  .cell.start-cell.blue{background:var(--blue);}
+  .cell.start-cell.safe::after{content:'';}
   .cell.safe::after{
-    content:'';position:absolute;inset:15%;pointer-events:none;
-    background:#D8CFAE;
-    clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+    content:'☆';position:absolute;inset:0;pointer-events:none;
+    display:flex;align-items:center;justify-content:center;
+    color:#858b8d;font:400 115%/1 Arial,sans-serif;
   }
-  .cell.home-stretch.red{background:#F6C4B3;}
-  .cell.home-stretch.green{background:#BEE3C6;}
-  .cell.home-stretch.yellow{background:#FCEAA6;}
-  .cell.home-stretch.blue{background:#BBDBF0;}
+  .cell.home-stretch.red{background:var(--red);}
+  .cell.home-stretch.green{background:var(--green);}
+  .cell.home-stretch.yellow{background:var(--yellow);}
+  .cell.home-stretch.blue{background:var(--blue);}
   .entry-arrow{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:70%;font-weight:800;pointer-events:none;opacity:.55;
   }
-  .entry-arrow.red{color:var(--red);}
-  .entry-arrow.green{color:var(--green);}
-  .entry-arrow.yellow{color:var(--yellow);}
-  .entry-arrow.blue{color:var(--blue);}
+  .entry-arrow.red,.entry-arrow.green,.entry-arrow.yellow,.entry-arrow.blue{
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);opacity:.95;
+  }
 
-  .yard{position:relative;border-radius:10px;}
+  .yard{position:relative;border-radius:0;}
   .yard.red{background:var(--red);}
   .yard.green{background:var(--green);}
   .yard.yellow{background:var(--yellow);}
@@ -183,9 +191,9 @@
   .yard-label.top{top:4%;}
   .yard-label.bottom{bottom:4%;}
   .yard-inner{
-    position:absolute;inset:16%;background:#fff;border-radius:10px;
+    position:absolute;inset:16%;background:#fff;border-radius:2px;
     display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8%;
-    padding:11%;box-shadow:0 3px 10px rgba(0,0,0,.28);
+    padding:11%;border:1px solid rgba(0,0,0,.16);box-shadow:0 2px 6px rgba(0,0,0,.2);
   }
   .yard-slot{position:relative;}
   .yard-slot::before{
@@ -450,7 +458,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const COLORS = ['red','green','yellow','blue'];
-const COLOR_HEX = { red:'#E4572E', green:'#2E9E5B', yellow:'#F2B705', blue:'#1F6FB2' };
+const COLOR_HEX = { red:'#ED1C24', green:'#079447', yellow:'#FFD600', blue:'#159DE0' };
 const START_OFFSET = { red:0, green:13, yellow:26, blue:39 };
 const SAFE_CELLS = new Set([0,8,13,21,26,34,39,47]);
 const HOME_ENTRY = 51, FINISH = 56;
@@ -483,12 +491,12 @@ const YARD_RECT = {
   yellow: {row:'10/16',col:'10/16'},
   blue:   {row:'10/16',col:'1/7'},
 };
-// Decorative direction arrows near each color's exit lane, matching the classic board look.
+// Each player's start cell is colored and marked with its direction arrow.
 const ENTRY_ARROWS = {
-  2:  { color:'red',    glyph:'→' },
-  15: { color:'green',  glyph:'↓' },
-  28: { color:'yellow', glyph:'←' },
-  41: { color:'blue',   glyph:'↑' },
+  0:  { color:'red',    glyph:'→' },
+  13: { color:'green',  glyph:'↓' },
+  26: { color:'yellow', glyph:'←' },
+  39: { color:'blue',   glyph:'↑' },
 };
 
 function globalCell(color, rel){ return (START_OFFSET[color] + rel) % 52; }
@@ -773,6 +781,8 @@ function buildBoard(){
     const cell = document.createElement('div');
     cell.className = 'cell path';
     if (SAFE_CELLS.has(idx)) cell.classList.add('safe');
+    const startColor = COLORS.find(color => START_OFFSET[color] === idx);
+    if(startColor) cell.classList.add('start-cell', startColor);
     cell.style.gridRow = `${rc[0]}`;
     cell.style.gridColumn = `${rc[1]}`;
     cell.id = `cell-path-${idx}`;
