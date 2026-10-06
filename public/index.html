@@ -75,7 +75,6 @@
     width:100%;padding:12px 14px;border-radius:10px;background:#0F1230;
     color:var(--cream);font-size:16px;font-family:'Inter',sans-serif;
   }
-  .mobile-server-help{color:var(--muted);font-size:11px;margin-top:6px;line-height:1.45;}
   .field select{
     width:100%;padding:12px 14px;border-radius:10px;border:none;
     background:#0F1230;color:var(--cream);font-size:16px;font-family:'Inter',sans-serif;
@@ -507,12 +506,6 @@
       <button class="btn btn-outline" id="btn-reconnect-dismiss" style="margin-top:8px;">Start fresh instead</button>
     </div>
     <div class="card">
-      <div class="field hidden" id="mobile-server-field">
-        <label for="mobile-server-url">Online game server (HTTPS)</label>
-        <input id="mobile-server-url" type="url" inputmode="url" autocomplete="url" placeholder="https://your-game-server.example" />
-        <button class="btn btn-outline" id="btn-save-mobile-server" type="button" style="margin-top:8px;">Connect to server</button>
-        <div class="mobile-server-help" id="mobile-server-help">Use the HTTPS address where the game server is hosted.</div>
-      </div>
       <div class="field">
         <label>Your name</label>
         <input id="input-name" maxlength="16" placeholder="e.g. Asha" />
@@ -608,7 +601,7 @@
   </div>
 </div>
 
-<script src="/vendor/socket.io.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 <script>
 const FOUR_PLAYER_COLORS = ['red','green','yellow','blue'];
 const SIX_PLAYER_COLORS = ['red','green','orange','blue','yellow','purple'];
@@ -825,37 +818,7 @@ const Sound = (() => {
   };
 })();
 
-const MOBILE_SERVER_KEY = 'ludo_server_url';
-const isNativeApp = window.location.protocol === 'capacitor:' ||
-  (window.location.hostname === 'localhost' && !window.location.port);
-const mobileServerUrl = localStorage.getItem(MOBILE_SERVER_KEY) || '';
-let socket = io(isNativeApp ? (mobileServerUrl || undefined) : undefined, {
-  autoConnect: !isNativeApp || !!mobileServerUrl,
-  ...(isNativeApp ? { transports: ['websocket'] } : {}),
-});
-if(isNativeApp){
-  $('mobile-server-field').classList.remove('hidden');
-  $('mobile-server-url').value = mobileServerUrl;
-  if(!mobileServerUrl){
-    ['btn-create','btn-play-ai','btn-join'].forEach(id => { $(id).disabled = true; });
-    $('mobile-server-help').textContent = 'Enter the HTTPS address of your hosted game server to enable online play.';
-  }
-}
-$('btn-save-mobile-server').onclick = () => {
-  const raw = $('mobile-server-url').value.trim();
-  let parsed;
-  try{ parsed = new URL(raw); }catch(e){ parsed = null; }
-  if(!parsed || parsed.protocol !== 'https:' || !parsed.host){
-    $('mobile-server-help').textContent = 'Enter a valid HTTPS address, for example https://your-game-server.example.';
-    return;
-  }
-  localStorage.setItem(MOBILE_SERVER_KEY, parsed.origin);
-  $('mobile-server-help').textContent = `Connecting to ${parsed.origin}…`;
-  window.location.reload();
-};
-socket.on('connect_error', () => {
-  if(isNativeApp) $('mobile-server-help').textContent = 'Could not reach that game server. Check the URL and try again.';
-});
+let socket = io();
 let myColor = null, roomCode = null, isHost = false, myToken = null;
 let lastState = null;
 let displayedTokens = null; // lags behind server state while animating
