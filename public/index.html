@@ -161,12 +161,16 @@
     grid-template-columns:repeat(35,1fr);grid-template-rows:repeat(35,1fr);
     width:min(94vw,620px);height:min(94vw,620px);
     gap:0;background:transparent;border:0;border-radius:0;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));
   }
   .board.six-player::before{
     content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
-    background:linear-gradient(145deg,#fff 0%,#f1f3f4 100%);
-    clip-path:polygon(34% 0,66% 0,100% 34%,100% 66%,66% 100%,34% 100%,0 66%,0 34%);
-    filter:drop-shadow(0 2px 3px rgba(0,0,0,.42));
+    background-color:#f5f6f5;
+    background-image:
+      linear-gradient(to bottom,rgba(133,143,149,.34) 1px,transparent 1px),
+      linear-gradient(to right,rgba(133,143,149,.34) 1px,transparent 1px);
+    background-size:2.8571429% 2.8571429%;
+    clip-path:polygon(37% 23%,66% 23%,80% 51%,66% 80%,37% 80%,23% 51%);
   }
   .board.six-player>*{z-index:1;}
   .cell{background:#f7f7f4;position:relative;}
@@ -210,12 +214,12 @@
   .yard.blue{background:var(--blue);--yard-base:var(--blue);--yard-flash:#52BDFA;}
   .yard.purple{background:var(--purple);--yard-base:var(--purple);--yard-flash:#B374E8;}
   .yard.orange{background:var(--orange);--yard-base:var(--orange);--yard-flash:#FFA04E;}
-  .board.six-player .yard{filter:drop-shadow(0 0 1.5px #111827);}
+  .board.six-player .yard{filter:drop-shadow(0 0 2px #111827);}
   .board.six-player .yard.red{--house-shape:polygon(0 0,100% 0,50% 100%);clip-path:var(--house-shape);}
   .board.six-player .yard.green{--house-shape:polygon(100% 0,100% 100%,0 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard.orange{--house-shape:polygon(0 0,100% 100%,0 100%);clip-path:var(--house-shape);}
+  .board.six-player .yard.orange{--house-shape:polygon(0 0,100% 0,100% 100%);clip-path:var(--house-shape);}
   .board.six-player .yard.blue{--house-shape:polygon(0 100%,100% 100%,50% 0);clip-path:var(--house-shape);}
-  .board.six-player .yard.yellow{--house-shape:polygon(0 100%,100% 0,100% 100%);clip-path:var(--house-shape);}
+  .board.six-player .yard.yellow{--house-shape:polygon(0 0,0 100%,100% 100%);clip-path:var(--house-shape);}
   .board.six-player .yard.purple{--house-shape:polygon(0 0,0 100%,100% 100%);clip-path:var(--house-shape);}
   .board.six-player .yard-inner{inset:12%;padding:8%;gap:5%;clip-path:var(--house-shape);}
   .yard.turn-active{animation:yardTurnBlink .7s steps(2,end) infinite;}
@@ -238,7 +242,7 @@
   .yard-label{
     position:absolute;left:0;right:0;text-align:center;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:min(3.6vw,18px);
-    color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35);pointer-events:none;
+    color:#fff;text-shadow:0 1px 2px #121212,0 0 4px rgba(0,0,0,.65);pointer-events:none;z-index:6;
     opacity:0;transition:opacity .2s ease;
   }
   .yard-label.visible{opacity:1;}
@@ -246,6 +250,10 @@
   .yard-label.bottom{bottom:4%;}
   .yard-label.right{left:auto;right:2%;top:50%;bottom:auto;width:82%;transform:translateY(-50%) rotate(90deg);}
   .yard-label.left{left:-1%;right:auto;top:50%;bottom:auto;width:82%;transform:translateY(-50%) rotate(-90deg);}
+  .board.six-player .yard-label.diagonal-up,
+  .board.six-player .yard-label.diagonal-down{left:0;right:0;top:43%;bottom:auto;width:100%;font-size:min(2.8vw,15px);}
+  .board.six-player .yard-label.diagonal-up{transform:rotate(-45deg);}
+  .board.six-player .yard-label.diagonal-down{transform:rotate(45deg);}
   .yard-inner{
     position:absolute;inset:16%;background:#fff;border-radius:2px;
     display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8%;
@@ -281,9 +289,21 @@
   .center-home{
     position:relative;background:#fff;
   }
+  .center-home.six-player{background:var(--navy);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);}
   .center-home svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
   .home-slot{position:absolute;width:36%;height:36%;transform:translate(0,0);}
   .center-home.six-player .home-slot{width:24%;height:24%;}
+  .board-die{
+    position:absolute;left:38%;top:38%;width:24%;height:24%;z-index:3;
+    padding:0;border:2px solid #49c9f4;border-radius:24%;
+    background:linear-gradient(145deg,#2dd3ff,#079de0 72%);
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.55),0 3px 7px rgba(0,0,0,.35);
+    cursor:pointer;display:grid;place-items:center;
+  }
+  .board-die::after{content:'';width:24%;height:24%;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);}
+  .board-die.clickable{animation:boardDiePulse 1s ease-in-out infinite;}
+  .board-die:disabled{cursor:default;}
+  @keyframes boardDiePulse{0%,100%{filter:brightness(1);transform:scale(1);}50%{filter:brightness(1.16);transform:scale(1.08);}}
 
   .token{
     position:absolute;inset:9%;margin:auto;
@@ -613,39 +633,47 @@ const ENTRY_ARROWS_FOUR = {
 
 function buildSixPlayerPath(){
   const path = [];
-  let row = 8, column = 18;
-  [[0,1],[1,0],[1,-1],[0,-1],[-1,0],[-1,1]].forEach(([dr,dc]) => {
-    for(let step=0;step<10;step++){
+  let row = 8, column = 13;
+  const segments = [
+    Array(10).fill([0,1]),
+    Array.from({length:10},(_,step) => step%2 ? [1,1] : [1,0]),
+    Array.from({length:10},(_,step) => step%2 ? [1,-1] : [1,0]),
+    Array(10).fill([0,-1]),
+    Array.from({length:10},(_,step) => step%2 ? [-1,-1] : [-1,0]),
+    Array.from({length:10},(_,step) => step%2 ? [-1,1] : [-1,0]),
+  ];
+  segments.forEach(moves => {
+    moves.forEach(([dr,dc]) => {
       path.push([row,column]);
       row += dr;
       column += dc;
-    }
+    });
   });
   return path;
 }
 const PATH_SIX = buildSixPlayerPath();
 const HOME_STRETCH_SIX = {
-  red:    [[11,16],[12,16],[13,16],[14,16],[15,16]],
-  green:  [[9,25],[10,24],[11,23],[12,22],[13,21]],
-  orange: [[16,27],[16,26],[16,25],[16,24],[16,23]],
-  blue:   [[25,20],[24,20],[23,20],[22,20],[21,20]],
-  yellow: [[27,11],[26,12],[25,13],[24,14],[23,15]],
-  purple: [[20,9],[20,10],[20,11],[20,12],[20,13]],
+  red:    [[10,13],[11,14],[12,15],[13,16],[14,17]],
+  green:  [[10,22],[11,21],[12,20],[13,19],[14,18]],
+  orange: [[18,26],[18,25],[18,24],[18,23],[18,22]],
+  blue:   [[27,23],[26,22],[25,21],[24,20],[23,19]],
+  yellow: [[27,13],[26,14],[25,15],[24,16],[23,17]],
+  purple: [[19,9],[19,10],[19,11],[19,12],[19,13]],
 };
 const YARD_RECT_SIX = {
-  red:    {row:'1/10', col:'12/24', label:'top'},
-  green:  {row:'2/14', col:'24/36', label:'right'},
-  orange: {row:'22/34',col:'24/36', label:'right'},
-  blue:   {row:'27/36',col:'12/24', label:'bottom'},
-  yellow: {row:'22/34',col:'1/13',  label:'left'},
-  purple: {row:'2/14', col:'1/13',  label:'left'},
+  red:    {row:'1/12', col:'12/24', label:'top'},
+  green:  {row:'4/15', col:'24/36', label:'diagonal-up'},
+  orange: {row:'21/32',col:'24/36', label:'diagonal-down'},
+  blue:   {row:'24/36',col:'12/24', label:'bottom'},
+  yellow: {row:'21/32',col:'1/13',  label:'diagonal-down'},
+  purple: {row:'4/15', col:'1/13',  label:'diagonal-down'},
 };
 const ENTRY_ARROWS_SIX = {
   0:  { color:'red',    glyph:'→' },
-  10: { color:'green',  glyph:'↓' },
+  10: { color:'green',  glyph:'↘' },
   20: { color:'orange', glyph:'↙' },
   30: { color:'blue',   glyph:'←' },
-  40: { color:'yellow', glyph:'↑' },
+  40: { color:'yellow', glyph:'↖' },
   50: { color:'purple', glyph:'↗' },
 };
 let PATH = PATH_FOUR;
@@ -942,13 +970,19 @@ function buildCenterHome(board, sixPlayer){
   center.id = 'cell-center';
   if(sixPlayer){
     center.innerHTML = `<svg viewBox="0 0 100 100">
-      <polygon points="50,50 30,0 70,0" fill="${COLOR_HEX.red}"/>
-      <polygon points="50,50 70,0 100,25 100,50" fill="${COLOR_HEX.green}"/>
-      <polygon points="50,50 100,50 100,75 70,100" fill="${COLOR_HEX.orange}"/>
-      <polygon points="50,50 70,100 30,100" fill="${COLOR_HEX.blue}"/>
-      <polygon points="50,50 30,100 0,75 0,50" fill="${COLOR_HEX.yellow}"/>
-      <polygon points="50,50 0,50 0,25 30,0" fill="${COLOR_HEX.purple}"/>
+      <polygon points="50,50 25,0 75,0" fill="${COLOR_HEX.red}"/>
+      <polygon points="50,50 75,0 100,50" fill="${COLOR_HEX.green}"/>
+      <polygon points="50,50 100,50 75,100" fill="${COLOR_HEX.orange}"/>
+      <polygon points="50,50 75,100 25,100" fill="${COLOR_HEX.blue}"/>
+      <polygon points="50,50 25,100 0,50" fill="${COLOR_HEX.yellow}"/>
+      <polygon points="50,50 0,50 25,0" fill="${COLOR_HEX.purple}"/>
     </svg>`;
+    const die = document.createElement('button');
+    die.className = 'board-die';
+    die.type = 'button';
+    die.setAttribute('aria-label','Roll dice');
+    die.onclick = () => $('dice-display').click();
+    center.appendChild(die);
   } else {
     center.innerHTML = `<svg viewBox="0 0 100 100">
       <polygon points="0,0 50,50 100,0" fill="${COLOR_HEX.green}"/>
@@ -1451,6 +1485,11 @@ function refreshDiceState(){
   const d = $('dice-display');
   d.classList.toggle('clickable', rollable);
   d.classList.toggle('blink', rollable);
+  const boardDie = $('board-die');
+  if(boardDie){
+    boardDie.classList.toggle('clickable', rollable);
+    boardDie.disabled = !rollable;
+  }
   const cp = lastState && lastState.players[lastState.turnIndex];
   const myTurn = cp && cp.color === myColor;
   let hint = '';
