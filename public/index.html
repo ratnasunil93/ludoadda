@@ -214,14 +214,19 @@
   .yard.blue{background:var(--blue);--yard-base:var(--blue);--yard-flash:#52BDFA;}
   .yard.purple{background:var(--purple);--yard-base:var(--purple);--yard-flash:#B374E8;}
   .yard.orange{background:var(--orange);--yard-base:var(--orange);--yard-flash:#FFA04E;}
-  .board.six-player .yard{filter:drop-shadow(0 0 2px #111827);}
-  .board.six-player .yard.red{--house-shape:polygon(0 0,100% 0,50% 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard.green{--house-shape:polygon(100% 0,100% 100%,0 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard.orange{--house-shape:polygon(0 0,100% 0,100% 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard.blue{--house-shape:polygon(0 100%,100% 100%,50% 0);clip-path:var(--house-shape);}
-  .board.six-player .yard.yellow{--house-shape:polygon(0 0,0 100%,100% 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard.purple{--house-shape:polygon(0 0,0 100%,100% 100%);clip-path:var(--house-shape);}
-  .board.six-player .yard-inner{inset:12%;padding:8%;gap:5%;clip-path:var(--house-shape);}
+  .board.six-player .yard{z-index:4;background:transparent;}
+  .board.six-player .yard::before{
+    content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+    background:var(--yard-base);clip-path:var(--house-shape);
+    filter:drop-shadow(0 0 2px #0b111c) drop-shadow(0 1px 1px rgba(0,0,0,.7));
+  }
+  .board.six-player .yard.red{--house-shape:polygon(0 0,100% 0,50% 100%);}
+  .board.six-player .yard.green{--house-shape:polygon(50% 0,100% 100%,0 100%);}
+  .board.six-player .yard.orange{--house-shape:polygon(0 0,100% 0,50% 100%);}
+  .board.six-player .yard.blue{--house-shape:polygon(0 100%,100% 100%,50% 0);}
+  .board.six-player .yard.yellow{--house-shape:polygon(0 0,100% 0,50% 100%);}
+  .board.six-player .yard.purple{--house-shape:polygon(50% 0,100% 100%,0 100%);}
+  .board.six-player .yard-inner{inset:18% 16%;padding:8%;gap:5%;clip-path:var(--house-shape);}
   .yard.turn-active{animation:yardTurnBlink .7s steps(2,end) infinite;}
   @keyframes yardTurnBlink{
     0%,100%{background-color:var(--yard-base);}
@@ -229,6 +234,7 @@
   }
   @media(prefers-reduced-motion:reduce){
     .yard.turn-active{animation:none;background-color:var(--yard-flash);}
+    .board.six-player .yard.turn-active::before{animation:none;background-color:var(--yard-flash);}
   }
   .yard-ring{
     --ring-pct:0%;
@@ -239,6 +245,8 @@
     opacity:0; transition:opacity .2s ease; pointer-events:none;
   }
   .yard-ring.active{opacity:1;}
+  .board.six-player .yard-ring{display:none;}
+  .board.six-player .yard.turn-active::before{animation:yardTurnBlink .7s steps(2,end) infinite;}
   .yard-label{
     position:absolute;left:0;right:0;text-align:center;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:min(3.6vw,18px);
@@ -251,9 +259,22 @@
   .yard-label.right{left:auto;right:2%;top:50%;bottom:auto;width:82%;transform:translateY(-50%) rotate(90deg);}
   .yard-label.left{left:-1%;right:auto;top:50%;bottom:auto;width:82%;transform:translateY(-50%) rotate(-90deg);}
   .board.six-player .yard-label.diagonal-up,
-  .board.six-player .yard-label.diagonal-down{left:0;right:0;top:43%;bottom:auto;width:100%;font-size:min(2.8vw,15px);}
-  .board.six-player .yard-label.diagonal-up{transform:rotate(-45deg);}
-  .board.six-player .yard-label.diagonal-down{transform:rotate(45deg);}
+  .board.six-player .yard-label.diagonal-down{
+    right:auto;top:43%;bottom:auto;width:90%;font-size:min(2.2vw,12px);
+    padding:0;border:0;border-radius:0;background:transparent;white-space:nowrap;
+    color:#11151c;text-shadow:0 1px rgba(255,255,255,.38);line-height:1.1;
+  }
+  .board.six-player .yard-label.top,
+  .board.six-player .yard-label.bottom{
+    left:8%;right:8%;width:auto;padding:0 3px;border:2px solid #11151c;border-radius:4px;
+    background:var(--yard-base);color:#11151c;text-shadow:none;line-height:1.05;
+  }
+  .board.six-player .yard-label.top{top:1%;}
+  .board.six-player .yard-label.bottom{bottom:1%;}
+  .board.six-player .yard.purple .yard-label{left:-19%;transform:rotate(-60deg);}
+  .board.six-player .yard.green .yard-label{left:29%;transform:rotate(60deg);}
+  .board.six-player .yard.yellow .yard-label{left:-19%;transform:rotate(60deg);}
+  .board.six-player .yard.orange .yard-label{left:29%;transform:rotate(-60deg);}
   .yard-inner{
     position:absolute;inset:16%;background:#fff;border-radius:2px;
     display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8%;
@@ -662,11 +683,11 @@ const HOME_STRETCH_SIX = {
 };
 const YARD_RECT_SIX = {
   red:    {row:'1/12', col:'12/24', label:'top'},
-  green:  {row:'4/15', col:'24/36', label:'diagonal-up'},
-  orange: {row:'21/32',col:'24/36', label:'diagonal-down'},
+  green:  {row:'4/15', col:'23/36', label:'diagonal-down'},
+  orange: {row:'21/32',col:'23/36', label:'diagonal-up'},
   blue:   {row:'24/36',col:'12/24', label:'bottom'},
   yellow: {row:'21/32',col:'1/13',  label:'diagonal-down'},
-  purple: {row:'4/15', col:'1/13',  label:'diagonal-down'},
+  purple: {row:'4/15', col:'1/13',  label:'diagonal-up'},
 };
 const ENTRY_ARROWS_SIX = {
   0:  { color:'red',    glyph:'→' },
