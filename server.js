@@ -316,10 +316,12 @@ function performMove(room, tokenIdx, reason) {
   if (dice === null || !room.movable.includes(tokenIdx)) return;
 
   const { captured } = applyMove(room, cp.color, tokenIdx, dice);
+  const reachedDestination = room.tokens[cp.color][tokenIdx] === roomConfig(room).finish;
   if (reason === 'timeout') room.log.push(`${cp.color} ran out of time — moved a token automatically`);
   else if (reason === 'bot') room.log.push(`${cp.color} (AI) moved a token`);
   else if (reason === 'auto') room.log.push(`${cp.color} auto-play moved a token`);
   else if (reason === 'single') room.log.push(`${cp.color} only had one legal move — played automatically`);
+  if (reachedDestination) room.log.push(`${cp.color} reached the destination and earned another roll!`);
 
   if (hasWon(room, cp.color) && !room.finishOrder.includes(cp.color)) {
     room.finishOrder.push(cp.color);
@@ -344,7 +346,7 @@ function performMove(room, tokenIdx, reason) {
     }
   }
 
-  const extraTurn = dice === 6 || captured;
+  const extraTurn = dice === 6 || captured || reachedDestination;
   advanceTurn(room, extraTurn);
   scheduleRollTimer(room);
   io.to(room.code).emit('room_update', publicState(room));
