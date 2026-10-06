@@ -39,13 +39,19 @@ needed).
 > to open the link after a while may wait ~30s for it to wake up. Fine for
 > casual games with friends; upgrade to a paid tier if you want it always warm.
 
+## Four- and six-player rooms
+
+Choose **4 players** or **6 players** in the lobby before creating a room or
+starting a solo game. Six-player rooms add purple and orange houses and use a
+60-space track. Friends who join a room use the host's selected board.
+
 ## Playing against AI
 
 Click **"🤖 Play vs AI (solo)"** right on the lobby screen for an instant
-1-tap solo game — it creates a room, fills the other 3 seats with bots, and
+1-tap solo game — it creates a room, fills the remaining seats with bots, and
 starts immediately. Or, in the waiting room, click **"+ Add AI player"** to
 add bots one at a time alongside real friends (any mix of humans and bots,
-up to 4 total). Bots play through the same turn-timer system as humans,
+up to the selected 4- or 6-player limit). Bots play through the same turn-timer system as humans,
 just with a short "thinking" delay (under a second) instead of the full
 human timeout, and use a simple priority heuristic: capture an opponent if
 possible, else finish a token if possible, else leave the yard on a 6, else
@@ -55,9 +61,17 @@ push the furthest-along token forward.
 
 If a roll leaves only one legal token to move, the server plays it
 automatically after a short beat (500ms) — no tap needed. This only
-applies to humans; if you'd rather always choose manually, remove the
-`movable.length === 1 && !cp.isBot` branch in `performRoll` inside
+applies to humans who have not enabled Auto play; if you'd rather always
+choose manually, remove the
+`movable.length === 1 && !cp.isBot && !cp.autoPlay` branch in `performRoll` inside
 `server.js`.
+
+## Auto-play for your player
+
+Use the **🤖 Auto play** toggle under the dice during a game to let the server
+roll and choose moves on your turns. It uses the bot's move priorities and can
+be switched on or off at any time. Other players see an **AUTO** marker beside
+your name while it is enabled.
 
 ## Pause / resume
 
@@ -113,8 +127,8 @@ top of `server.js`.
   every roll and move server-side, and broadcasts the new state to everyone
   in the room over WebSockets — that's what makes it "online multiplayer"
   rather than just a local game.
-- `public/index.html` renders the board with CSS Grid (a 15×15 grid matching
-  a real Ludo board's cross layout) and talks to the server purely through
+- `public/index.html` renders four-player and six-player CSS Grid boards and
+  talks to the server purely through
   Socket.IO events (`create_room`, `join_room`, `start_game`, `roll_dice`,
   `move_token`).
 

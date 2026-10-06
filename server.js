@@ -1,7 +1,7 @@
 // Ludo Online — server.js
 // Authoritative game server: rooms, turns, dice rolls, moves, captures, win detection,
-// per-turn timers (auto-play on timeout), AI bot players, pause/resume, and a timed
-// reconnection window for players who drop mid-game.
+// per-turn timers, optional player auto-play, AI bot players, pause/resume, and a
+// timed reconnection window for players who drop mid-game.
 
 const path = require('path');
 const express = require('express');
@@ -14,11 +14,22 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const COLORS = ['red', 'green', 'yellow', 'blue'];
-const START_OFFSET = { red: 0, green: 13, yellow: 26, blue: 39 };
-const SAFE_CELLS = new Set([0, 8, 13, 21, 26, 34, 39, 47]); // start cells + star cells
-const HOME_ENTRY = 51; // relative pos where a token leaves the shared 52-ring
-const FINISH = 56; // relative pos when a token reaches home
+const FOUR_PLAYER_COLORS = ['red', 'green', 'yellow', 'blue'];
+const SIX_PLAYER_COLORS = ['red', 'green', 'orange', 'blue', 'yellow', 'purple'];
+const FOUR_PLAYER_SAFE_CELLS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+const SIX_PLAYER_SAFE_CELLS = new Set([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]);
+const GAME_CONFIG = {
+  4: {
+    colors: FOUR_PLAYER_COLORS,
+    startOffset: { red: 0, green: 13, yellow: 26, blue: 39 },
+    ringSize: 52, homeEntry: 51, finish: 56, safeCells: FOUR_PLAYER_SAFE_CELLS,
+  },
+  6: {
+    colors: SIX_PLAYER_COLORS,
+    startOffset: { red: 0, green: 10, orange: 20, blue: 30, yellow: 40, purple: 50 },
+    ringSize: 60, homeEntry: 59, finish: 64, safeCells: SIX_PLAYER_SAFE_CELLS,
+  },
+};
 
 const ROLL_TIMEOUT_MS = 15000; // time a human has to roll the dice
 const MOVE_TIMEOUT_MS = 10000; // time a human has to pick which token to move
@@ -44,19 +55,17 @@ function genToken() {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
 
-function newRoom(code) {
+function newRoom(code, maxPlayers = 4) {
+  const config = GAME_CONFIG[maxPlayers] || GAME_CONFIG[4];
   return {
     code,
-    players: [], // { id, name, color, connected, token, isBot, icon, disconnectedAt }
+    maxPlayers: config.colors.length,
+    colors: config.colors,
+    players: [], // { id, name, color, connected, token, isBot, autoPlay, icon, disconnectedAt }
     status: 'waiting', // waiting | playing | finished
     paused: false,
     turnIndex: 0,
-    tokens: {
-      red: [-1, -1, -1, -1],
-      green: [-1, -1, -1, -1],
-      yellow: [-1, -1, -1, -1],
-      blue: [-1, -1, -1, -1],
-    },
+    tokens: Object.fromEntries(config.colors.map((color) => [color, [-1, -1, -1, -1]])),
     diceValue: null,
     consecutiveSixes: 0,
     movable: [],
@@ -77,11 +86,13 @@ function newRoom(code) {
 function publicState(room) {
   return {
     code: room.code,
+    maxPlayers: room.maxPlayers,
     players: room.players.map((p) => ({
       name: p.name,
       color: p.color,
       connected: p.connected,
       isBot: !!p.isBot,
+      autoPlay: !!p.autoPlay,
       icon: p.icon || null,
     })),
     status: room.status,
@@ -101,12 +112,16 @@ function publicState(room) {
 function currentPlayer(room) {
   return room.players[room.turnIndex];
 }
-function isBotTurn(room) {
+function isAutoTurn(room) {
   const cp = currentPlayer(room);
-  return !!(cp && cp.isBot);
+  return !!(cp && (cp.isBot || cp.autoPlay));
 }
-function globalCell(color, rel) {
-  return (START_OFFSET[color] + rel) % 52;
+function roomConfig(room) {
+  return GAME_CONFIG[room.maxPlayers] || GAME_CONFIG[4];
+}
+function globalCell(room, color, rel) {
+  const config = roomConfig(room);
+  return (config.startOffset[color] + rel) % config.ringSize;
 }
 
 function clearTimer(room) {
@@ -127,39 +142,40 @@ function scheduleTimer(room, type, ms) {
     if (room.paused) return;
     const cp = currentPlayer(room);
     if (type === 'roll') {
-      performRoll(room, cp && cp.isBot ? 'bot' : 'timeout');
+      performRoll(room, cp && cp.isBot ? 'bot' : cp && cp.autoPlay ? 'auto' : 'timeout');
     } else if (type === 'move') {
       const pool = room.movable;
       if (pool && pool.length) {
         const forcedSingle = room.autoSingle;
         room.autoSingle = false;
-        const tokenIdx = cp && cp.isBot
+        const tokenIdx = cp && (cp.isBot || cp.autoPlay)
           ? chooseBotMove(room, cp.color, pool)
           : (forcedSingle ? pool[0] : pool[Math.floor(Math.random() * pool.length)]);
-        const reason = cp && cp.isBot ? 'bot' : (forcedSingle ? 'single' : 'timeout');
+        const reason = cp && cp.isBot ? 'bot' : cp && cp.autoPlay ? 'auto' : (forcedSingle ? 'single' : 'timeout');
         performMove(room, tokenIdx, reason);
       }
     }
   }, ms);
 }
 function scheduleRollTimer(room) {
-  scheduleTimer(room, 'roll', isBotTurn(room) ? BOT_ROLL_MS : ROLL_TIMEOUT_MS);
+  scheduleTimer(room, 'roll', isAutoTurn(room) ? BOT_ROLL_MS : ROLL_TIMEOUT_MS);
 }
 function scheduleMoveTimer(room) {
-  scheduleTimer(room, 'move', isBotTurn(room) ? BOT_MOVE_MS : MOVE_TIMEOUT_MS);
+  scheduleTimer(room, 'move', isAutoTurn(room) ? BOT_MOVE_MS : MOVE_TIMEOUT_MS);
 }
 
 function computeMovable(room, color, dice) {
+  const { finish } = roomConfig(room);
   const movable = [];
   const tokens = room.tokens[color];
   tokens.forEach((pos, idx) => {
     if (pos === -1) {
       if (dice === 6) movable.push(idx); // can leave yard only on a 6
-    } else if (pos === FINISH) {
+    } else if (pos === finish) {
       // already home, can't move
     } else {
       const next = pos + dice;
-      if (next <= FINISH) movable.push(idx); // must not overshoot
+      if (next <= finish) movable.push(idx); // must not overshoot
     }
   });
   return movable;
@@ -167,24 +183,26 @@ function computeMovable(room, color, dice) {
 
 /** Would moving this token capture an opponent? Used by the bot heuristic. */
 function wouldCapture(room, color, tokenIdx, dice) {
+  const { homeEntry, safeCells } = roomConfig(room);
   const pos = room.tokens[color][tokenIdx];
   const newPos = pos === -1 ? 0 : pos + dice;
-  if (newPos >= HOME_ENTRY) return false;
-  const gcell = globalCell(color, newPos);
-  if (SAFE_CELLS.has(gcell)) return false;
-  return COLORS.some((oc) => oc !== color && room.tokens[oc].some((opos) =>
-    opos !== -1 && opos < HOME_ENTRY && globalCell(oc, opos) === gcell));
+  if (newPos >= homeEntry) return false;
+  const gcell = globalCell(room, color, newPos);
+  if (safeCells.has(gcell)) return false;
+  return room.colors.some((oc) => oc !== color && room.tokens[oc].some((opos) =>
+    opos !== -1 && opos < homeEntry && globalCell(room, oc, opos) === gcell));
 }
 
 /** Simple priority heuristic: capture > finish a token > leave the yard > push the furthest token. */
 function chooseBotMove(room, color, movable) {
+  const { finish } = roomConfig(room);
   const dice = room.diceValue;
   const captureMoves = movable.filter((idx) => wouldCapture(room, color, idx, dice));
   if (captureMoves.length) return captureMoves[Math.floor(Math.random() * captureMoves.length)];
 
   const finishMoves = movable.filter((idx) => {
     const pos = room.tokens[color][idx];
-    return (pos === -1 ? 0 : pos + dice) === FINISH;
+    return (pos === -1 ? 0 : pos + dice) === finish;
   });
   if (finishMoves.length) return finishMoves[0];
 
@@ -200,6 +218,7 @@ function chooseBotMove(room, color, movable) {
 }
 
 function applyMove(room, color, tokenIdx, dice) {
+  const { homeEntry, safeCells, finish } = roomConfig(room);
   const tokens = room.tokens[color];
   let pos = tokens[tokenIdx];
   let captured = false;
@@ -208,14 +227,14 @@ function applyMove(room, color, tokenIdx, dice) {
   else pos = pos + dice;
   tokens[tokenIdx] = pos;
 
-  if (pos < HOME_ENTRY) {
-    const gcell = globalCell(color, pos);
-    if (!SAFE_CELLS.has(gcell)) {
-      for (const otherColor of COLORS) {
+  if (pos < homeEntry) {
+    const gcell = globalCell(room, color, pos);
+    if (!safeCells.has(gcell)) {
+      for (const otherColor of room.colors) {
         if (otherColor === color) continue;
         const otherTokens = room.tokens[otherColor];
         otherTokens.forEach((opos, oi) => {
-          if (opos !== -1 && opos < HOME_ENTRY && globalCell(otherColor, opos) === gcell) {
+          if (opos !== -1 && opos < homeEntry && globalCell(room, otherColor, opos) === gcell) {
             otherTokens[oi] = -1;
             captured = true;
             room.log.push(`${otherColor} token sent home by ${color}!`);
@@ -225,12 +244,13 @@ function applyMove(room, color, tokenIdx, dice) {
     }
   }
 
-  if (pos === FINISH) room.log.push(`${color} token reached home!`);
+  if (pos === finish) room.log.push(`${color} token reached home!`);
   return { captured };
 }
 
 function hasWon(room, color) {
-  return room.tokens[color].every((p) => p === FINISH);
+  const { finish } = roomConfig(room);
+  return room.tokens[color].every((p) => p === finish);
 }
 
 function advanceTurn(room, extraTurn) {
@@ -255,9 +275,9 @@ function performRoll(room, reason) {
 
   const dice = 1 + Math.floor(Math.random() * 6);
   room.diceValue = dice;
-  const suffix = reason === 'timeout' ? ' (time ran out — auto-rolled)' : reason === 'bot' ? ' (AI)' : '';
+  const suffix = reason === 'timeout' ? ' (time ran out — auto-rolled)' : reason === 'bot' ? ' (AI)' : reason === 'auto' ? ' (auto-play)' : '';
   room.log.push(`${cp.color} rolled a ${dice}${suffix}`);
-  io.to(room.code).emit('dice_rolled', { color: cp.color, value: dice, auto: reason === 'timeout' });
+  io.to(room.code).emit('dice_rolled', { color: cp.color, value: dice, auto: reason === 'timeout' || reason === 'auto' });
 
   if (dice === 6) room.consecutiveSixes += 1;
   else room.consecutiveSixes = 0;
@@ -277,7 +297,7 @@ function performRoll(room, reason) {
     room.log.push(`${cp.color} has no valid moves`);
     advanceTurn(room, dice === 6);
     scheduleRollTimer(room);
-  } else if (movable.length === 1 && !cp.isBot) {
+  } else if (movable.length === 1 && !cp.isBot && !cp.autoPlay) {
     // Only one legal token can move — play it automatically, no tap needed.
     room.autoSingle = true;
     scheduleTimer(room, 'move', AUTO_MOVE_MS);
@@ -298,6 +318,7 @@ function performMove(room, tokenIdx, reason) {
   const { captured } = applyMove(room, cp.color, tokenIdx, dice);
   if (reason === 'timeout') room.log.push(`${cp.color} ran out of time — moved a token automatically`);
   else if (reason === 'bot') room.log.push(`${cp.color} (AI) moved a token`);
+  else if (reason === 'auto') room.log.push(`${cp.color} auto-play moved a token`);
   else if (reason === 'single') room.log.push(`${cp.color} only had one legal move — played automatically`);
 
   if (hasWon(room, cp.color) && !room.finishOrder.includes(cp.color)) {
@@ -344,12 +365,13 @@ io.on('connection', (socket) => {
   socket.data.roomCode = null;
   socket.data.color = null;
 
-  socket.on('create_room', ({ name }, cb) => {
+  socket.on('create_room', (payload = {}, cb) => {
+    const { name, maxPlayers } = payload;
     const code = genCode();
-    const room = newRoom(code);
-    const color = COLORS[0];
+    const room = newRoom(code, Number(maxPlayers) === 6 ? 6 : 4);
+    const color = room.colors[0];
     const token = genToken();
-    room.players.push({ id: socket.id, name: name?.slice(0, 16) || 'Player', color, connected: true, token });
+    room.players.push({ id: socket.id, name: name?.slice(0, 16) || 'Player', color, connected: true, token, autoPlay: false });
     rooms.set(code, room);
     socket.join(code);
     socket.data.roomCode = code;
@@ -362,11 +384,12 @@ io.on('connection', (socket) => {
     const room = rooms.get((code || '').toUpperCase());
     if (!room) return cb({ ok: false, error: 'Room not found' });
     if (room.status !== 'waiting') return cb({ ok: false, error: 'Game already started' });
-    if (room.players.length >= 4) return cb({ ok: false, error: 'Room is full' });
+    if (room.players.length >= room.maxPlayers) return cb({ ok: false, error: 'Room is full' });
     const usedColors = new Set(room.players.map((p) => p.color));
-    const color = COLORS.find((c) => !usedColors.has(c));
+    const color = room.colors.find((c) => !usedColors.has(c));
+    if (!color) return cb({ ok: false, error: 'Room is full' });
     const token = genToken();
-    room.players.push({ id: socket.id, name: name?.slice(0, 16) || 'Player', color, connected: true, token });
+    room.players.push({ id: socket.id, name: name?.slice(0, 16) || 'Player', color, connected: true, token, autoPlay: false });
     rooms.set(room.code, room);
     socket.join(room.code);
     socket.data.roomCode = room.code;
@@ -399,9 +422,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status !== 'waiting') return;
     if (!room.players.length || room.players[0].id !== socket.id) return; // host only
-    if (room.players.length >= 4) return;
+    if (room.players.length >= room.maxPlayers) return;
     const usedColors = new Set(room.players.map((p) => p.color));
-    const color = COLORS.find((c) => !usedColors.has(c));
+    const color = room.colors.find((c) => !usedColors.has(c));
     if (!color) return;
     room.players.push({
       id: `bot-${color}-${Date.now()}`,
@@ -427,6 +450,30 @@ io.on('connection', (socket) => {
     const player = room.players.find((p) => p.id === socket.id);
     if (!player) return;
     player.icon = TOKEN_ICONS.includes(icon) ? icon : null;
+    io.to(room.code).emit('room_update', publicState(room));
+  });
+
+  socket.on('set_auto_play', (payload = {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.status === 'finished') return;
+    const player = room.players.find((p) => p.id === socket.id && !p.isBot);
+    if (!player) return;
+    player.autoPlay = payload?.enabled === true;
+
+    if (room.status === 'playing' && currentPlayer(room)?.id === socket.id) {
+      if (room.paused) {
+        if (room.pausedTimerType === 'roll') {
+          room.pausedRemainingMs = player.autoPlay ? BOT_ROLL_MS : ROLL_TIMEOUT_MS;
+        } else if (room.pausedTimerType === 'move' && !room.autoSingle) {
+          room.pausedRemainingMs = player.autoPlay ? BOT_MOVE_MS : MOVE_TIMEOUT_MS;
+        }
+      } else if (room.timerType === 'roll' && room.diceValue === null) {
+        scheduleRollTimer(room);
+      } else if (room.timerType === 'move' && room.diceValue !== null && !room.autoSingle) {
+        scheduleMoveTimer(room);
+      }
+    }
+
     io.to(room.code).emit('room_update', publicState(room));
   });
 
