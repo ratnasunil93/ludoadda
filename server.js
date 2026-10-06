@@ -366,9 +366,9 @@ io.on('connection', (socket) => {
   socket.data.color = null;
 
   socket.on('create_room', (payload = {}, cb) => {
-    const { name, maxPlayers } = payload;
+    const { name } = payload;
     const code = genCode();
-    const room = newRoom(code, Number(maxPlayers) === 6 ? 6 : 4);
+    const room = newRoom(code, 4);
     const color = room.colors[0];
     const token = genToken();
     room.players.push({ id: socket.id, name: name?.slice(0, 16) || 'Player', color, connected: true, token, autoPlay: false });

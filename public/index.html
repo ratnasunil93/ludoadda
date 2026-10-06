@@ -71,6 +71,10 @@
     outline:2px solid transparent;
   }
   .field input:focus{outline:2px solid var(--gold);}
+  .field-value{
+    width:100%;padding:12px 14px;border-radius:10px;background:#0F1230;
+    color:var(--cream);font-size:16px;font-family:'Inter',sans-serif;
+  }
   .field select{
     width:100%;padding:12px 14px;border-radius:10px;border:none;
     background:#0F1230;color:var(--cream);font-size:16px;font-family:'Inter',sans-serif;
@@ -507,12 +511,8 @@
         <input id="input-name" maxlength="16" placeholder="e.g. Asha" />
       </div>
       <div class="field">
-        <label for="input-player-count">Game size</label>
-        <select id="input-player-count">
-          <option value="4">4 players</option>
-          <option value="6">6 players · adds purple and orange houses</option>
-        </select>
-        <div style="color:var(--muted);font-size:11px;margin-top:6px;">Applies to rooms you create and solo games; joining uses the host’s choice.</div>
+        <label>Players</label>
+        <div class="field-value">4 players</div>
       </div>
       <button class="btn btn-primary" id="btn-create">Create a room</button>
       <button class="btn btn-ai" id="btn-play-ai">🤖 Play vs AI (solo)</button>
@@ -916,8 +916,7 @@ refreshMuteIcon();
 $('btn-create').onclick = () => {
   Sound.unlock(); Sound.click();
   const name = $('input-name').value.trim() || 'Player';
-  const maxPlayers = Number($('input-player-count').value) === 6 ? 6 : 4;
-  socket.emit('create_room', { name, maxPlayers }, (res) => {
+  socket.emit('create_room', { name, maxPlayers: 4 }, (res) => {
     if(!res.ok){ $('lobby-error').textContent = res.error || 'Could not create room'; return; }
     roomCode = res.code; myColor = res.color; isHost = true; myToken = res.token;
     saveSession();
@@ -940,7 +939,7 @@ $('btn-start').onclick = () => { Sound.click(); socket.emit('start_game'); };
 $('btn-play-ai').onclick = () => {
   Sound.unlock(); Sound.click();
   const name = $('input-name').value.trim() || 'Player';
-  const maxPlayers = Number($('input-player-count').value) === 6 ? 6 : 4;
+  const maxPlayers = 4;
   socket.emit('create_room', { name, maxPlayers }, (res) => {
     if(!res.ok){ $('lobby-error').textContent = res.error || 'Could not start a game'; return; }
     roomCode = res.code; myColor = res.color; isHost = true; myToken = res.token;
